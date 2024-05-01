@@ -6,47 +6,83 @@ namespace TheatricalPlayersRefactoringKata
 {
     public class StatementPrinter
     {
-        public string Print(Invoice invoice, Dictionary<string, Play> plays)
+        private string _stringResult = "";
+        private string _htmlResult = "";
+        
+        private readonly CultureInfo _cultureInfo = new("en-US");
+        
+        public string Print(Invoice invoice, Dictionary<string, Play> plays, PrintType printType)
         {
             var totalAmount = 0;
             var volumeCredits = 0;
-            var result = string.Format("Statement for {0}\n", invoice.Customer);
-            CultureInfo cultureInfo = new CultureInfo("en-US");
+            WriteLineToResult("h1", string.Format("Statement for {0}", invoice.Customer));
 
             foreach(var perf in invoice.Performances) 
             {
-                var play = plays[perf.PlayID];
-                var thisAmount = 0;
-                switch (play.Type) 
-                {
-                    case "tragedy":
-                        thisAmount = 40000;
-                        if (perf.Audience > 30) {
-                            thisAmount += 1000 * (perf.Audience - 30);
-                        }
-                        break;
-                    case "comedy":
-                        thisAmount = 30000;
-                        if (perf.Audience > 20) {
-                            thisAmount += 10000 + 500 * (perf.Audience - 20);
-                        }
-                        thisAmount += 300 * perf.Audience;
-                        break;
-                    default:
-                        throw new Exception("unknown type: " + play.Type);
-                }
-                // add volume credits
-                volumeCredits += Math.Max(perf.Audience - 30, 0);
-                // add extra credit for every ten comedy attendees
-                if ("comedy" == play.Type) volumeCredits += (int)Math.Floor((decimal)perf.Audience / 5);
-
-                // print line for this order
-                result += String.Format(cultureInfo, "  {0}: {1:C} ({2} seats)\n", play.Name, Convert.ToDecimal(thisAmount / 100), perf.Audience);
-                totalAmount += thisAmount;
+                var play = plays[perf.PlayName];
+                
+                var amountInCents = GetAmountInCents(play.Type, perf.Audience);
+                
+                WriteLineToResult("p",String.Format(_cultureInfo, "  {0}: {1:C} ({2} seats)", play.Name, Convert.ToDecimal(amountInCents / 100), perf.Audience)); 
+                
+                totalAmount += amountInCents;
+                volumeCredits += GetVolumeCredits(play.Type, perf.Audience);
             }
-            result += String.Format(cultureInfo, "Amount owed is {0:C}\n", Convert.ToDecimal(totalAmount / 100));
-            result += String.Format("You earned {0} credits\n", volumeCredits);
-            return result;
+            
+            WriteLineToResult("b",String.Format(_cultureInfo, "Amount owed is {0:C}", Convert.ToDecimal(totalAmount / 100)));
+            WriteLineToResult("b", String.Format("You earned {0} credits", volumeCredits));
+
+            switch (printType)
+            {
+                case PrintType.String:
+                    return _stringResult;
+                case PrintType.Html:
+                    return _htmlResult;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(printType), printType, null);
+            }
+        }
+
+        private void WriteLineToResult(string htmlTag, string line)
+        {
+            _stringResult += $"{line}\n";
+            _htmlResult += $"<{htmlTag}>{line}</{htmlTag}>\n";
+        }
+
+        private int GetAmountInCents(PlayType playType, int performanceAudience)
+        {
+            var thisAmount = 0;
+            switch (playType) 
+            {
+                case PlayType.Tragedy:
+                    thisAmount = 40000;
+                    if (performanceAudience > 30) {
+                        thisAmount += 1000 * (performanceAudience - 30);
+                    }
+                    break;
+                case PlayType.Comedy:
+                    thisAmount = 30000;
+                    if (performanceAudience > 20) {
+                        thisAmount += 10000 + 500 * (performanceAudience - 20);
+                    }
+                    thisAmount += 300 * performanceAudience;
+                    break;
+                default:
+                    throw new Exception("unknown type: " + playType);
+            }
+
+            return thisAmount;
+        }
+
+        private int GetVolumeCredits(PlayType playType, int performanceAudience)
+        {
+            var volumeCredits = 0;
+
+            volumeCredits += Math.Max(performanceAudience - 30, 0);
+            if (playType == PlayType.Comedy) 
+                volumeCredits += (int)Math.Floor((decimal)performanceAudience / 5);
+
+            return volumeCredits;
         }
     }
 }
